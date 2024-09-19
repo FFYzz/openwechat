@@ -195,6 +195,28 @@ func (b *Bot) webInit() error {
 	return nil
 }
 
+// updateGroups 更新群组信息
+func (b *Bot) updateGroups(msg *Message) {
+	if msg.IsSendByGroup() {
+		if msg.FromUserName == msg.bot.self.User.UserName {
+			return
+		}
+		// 首先尝试从缓存里面查找, 如果没有找到则从服务器获取
+		members, err := msg.bot.self.Members()
+		if err != nil {
+			return
+		}
+		user, exist := members.GetByUserName(msg.FromUserName)
+		if !exist {
+			// 找不到, 从服务器获取
+			user = newUser(msg.Owner(), msg.FromUserName)
+			err = user.Detail()
+			b.self.members = b.self.members.Append(user)
+			b.self.groups = b.self.members.Groups()
+		}
+	}
+}
+
 // 轮询请求
 // 根据状态码判断是否有新的请求
 func (b *Bot) syncCheck() error {
@@ -242,6 +264,7 @@ func (b *Bot) syncCheck() error {
 				// 如配合 openwechat.MessageMatchDispatcher 使用
 				// NOTE: 请确保 MessageHandler 不会阻塞，否则会导致收不到后续的消息
 				if b.MessageHandler != nil {
+					b.updateGroups(message)
 					b.MessageHandler(message)
 				}
 			}
